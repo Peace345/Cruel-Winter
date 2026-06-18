@@ -75,7 +75,21 @@ let currentAlbum = {
       { file: "cruelwinter.mp3", title: "Cruel Winter", artist: "Kanye West" },
       { file: "spaceship.mp3", title: "Spaceship", artist: "Kanye West, Yo Gotti, Pusha T, Desiigner" },
       { file: "circle.mp3", title: "Circle", artist: "Kanye West, Pusha T, Ty Dolla $ign" },
-      { file: "enjoythepain.mp3", title: "Enjoy The Pain", artist: "Kanye West, John Legend" },
+      {
+        title: "Enjoy The Pain",
+        versions: [
+      {
+        version: "V3",
+        file: "enjoythepainv3.mp3",
+        artist: "Kanye West, John Legend"
+      },
+      {
+        version: "V1",
+        file: "enjoythepain.mp3",
+        artist: "Kanye West, John Legend"
+      }
+    ]
+  },
       { file: "comebacktomev2.mp3", title: "Come Back To Me", artist: "Kanye West, Teyena Taylor, Rick Ross" },
       { file: "onfire.mp3", title: "On Fire", artist: "Kanye West, John Legend" },
       { file: "allthetimev2.mp3", title: "All The Time (v2)", artist: "Kanye West, Big Sean" },
@@ -102,22 +116,105 @@ function buildSongs() {
   songsDiv.innerHTML = "";
 
   currentAlbum.songs.forEach((song, i) => {
-    const div = document.createElement("div");
-    div.className = "song";
 
-    div.innerHTML = `
-      <strong>${song.title}</strong><br>
-      <small>${song.artist || ""}</small>
-    `;
+    // SONG WITH MULTIPLE VERSIONS
+    if (song.versions) {
 
-    div.onclick = () => playSong(i);
+      const group = document.createElement("div");
+      group.className = "song";
 
-    songsDiv.appendChild(div);
+      group.innerHTML = `<strong>${song.title} ▼</strong>`;
+
+      group.onclick = () => {
+
+        // prevent duplicates
+        if (group.dataset.opened) return;
+        group.dataset.opened = true;
+
+        song.versions.forEach(version => {
+
+          const div = document.createElement("div");
+          div.className = "song";
+
+          div.innerHTML = `
+            <div style="display:flex; align-items:center;">
+              <div style="width:60px;">
+                <strong>${version.version}</strong>
+              </div>
+
+              <div style="flex:1; text-align:center;">
+                <strong>${song.title}</strong><br>
+                <small>${version.artist}</small>
+              </div>
+            </div>
+          `;
+
+          div.onclick = (e) => {
+            e.stopPropagation();
+
+            window.audio.src = version.file;
+            window.audio.play();
+
+            updateMediaSession({
+              title: song.title,
+              artist: version.artist
+            });
+          };
+
+          group.after(div);
+
+        });
+
+      };
+
+      songsDiv.appendChild(group);
+
+    }
+
+    // NORMAL SONG
+    else {
+
+      const div = document.createElement("div");
+      div.className = "song";
+
+      div.innerHTML = `
+        <strong>${song.title}</strong><br>
+        <small>${song.artist || ""}</small>
+      `;
+
+      div.onclick = () => playSong(i);
+
+      songsDiv.appendChild(div);
+
+    }
+
   });
+
 }
 
 // PLAY SONG
 function playSong(i) {
+
+  // Skip version groups
+  while (
+    i < currentAlbum.songs.length &&
+    currentAlbum.songs[i].versions
+  ) {
+    i++;
+  }
+
+  // Loop back to beginning if needed
+  if (i >= currentAlbum.songs.length) {
+    i = 0;
+
+    while (
+      i < currentAlbum.songs.length &&
+      currentAlbum.songs[i].versions
+    ) {
+      i++;
+    }
+  }
+
   currentIndex = i;
 
   const song = currentAlbum.songs[i];
@@ -194,20 +291,40 @@ window.addEventListener("DOMContentLoaded", () => {
   const audio = document.getElementById("audio");
 
   audio.addEventListener("ended", () => {
-    if (!currentAlbum) return;
+  if (!currentAlbum) return;
 
-    const nextIndex = currentIndex + 1;
+  const list = getPlayableSongs();
 
-    if (nextIndex < currentAlbum.songs.length) {
-      playSong(nextIndex);
-    } else {
-      playSong(0);
-    }
-  });
+  const currentSong = currentAlbum.songs[currentIndex];
+  const nextIndex = list.indexOf(currentSong) + 1;
+
+  if (nextIndex < list.length) {
+    const nextSong = list[nextIndex];
+
+    const realIndex = currentAlbum.songs.indexOf(nextSong);
+    playSong(realIndex);
+  } else {
+    playSong(currentAlbum.songs.indexOf(list[0]));
+  }
+});
 
   // expose audio globally so playSong can use it safely
   window.audio = audio;
 });
+
+function getPlayableSongs() {
+  const list = [];
+
+  currentAlbum.songs.forEach(song => {
+    if (song.versions) {
+      // skip the container entirely
+      return;
+    }
+    list.push(song);
+  });
+
+  return list;
+}
   
 </script>
 
